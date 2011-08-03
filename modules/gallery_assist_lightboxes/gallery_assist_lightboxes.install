@@ -1,0 +1,14 @@
+<?php
+// $Id: gallery_assist_lightboxes.install,v 1.2 2009/10/18 16:11:28 jcmc Exp $
+
+/**
+ * @file
+ */
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function gallery_assist_lightboxes_uninstall() {
+  variable_del('gallery_assist_lightbox');
+  variable_del('gallery_assist_lightbox_data');
+}

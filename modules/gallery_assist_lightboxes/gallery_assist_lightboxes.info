@@ -1,0 +1,13 @@
+; $Id: gallery_assist_lightboxes.info,v 1.1 2009/10/11 08:09:14 jcmc Exp $exp $
+name = Gallery Assist Lightboxes
+description = "Allow Gallery Assist to apply lightboxes."
+package = "Media"
+dependencies[] = gallery_assist
+core = 6.x
+
+; Information added by drupal.org packaging script on 2009-11-11
+version = "6.x-1.2-beta1"
+core = "6.x"
+project = "gallery_assist_lightboxes"
+datestamp = "1257948663"
+

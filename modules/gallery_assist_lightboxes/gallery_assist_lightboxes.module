@@ -1,0 +1,508 @@
+<?php
+// $Id: gallery_assist_lightboxes.module,v 1.4 2009/11/11 13:33:32 jcmc Exp $exp $
+
+/**
+ * @file
+ * A module that allow gallery assist to work with the differents lightbox variants.
+ */
+ 
+/**
+ * Implementation of hook_init.
+ */
+function gallery_assist_lightboxes_init() {
+  
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function gallery_assist_lightboxes_perm() {
+  // Access data for the gallery_assist conten type.
+  $access = array(
+    'administer gallery_assist_lightboxes',
+  );
+  
+  return $access;
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function gallery_assist_lightboxes_menu() {
+  $item = array();
+
+  // gallery_assist_lightboxes ahah callback test.
+  $items['gallery_assist_lightboxes/make/testform/js'] = array(
+    'page callback' => 'gallery_assist_lightbox_build_settingsform_js',
+    'access arguments' => array('administer gallery_assist_lightboxes'),
+    'type' => MENU_CALLBACK,
+  ); 
+  
+  return $items;
+}
+
+/**
+ * Save the selected lightbox variant settings.
+ */
+function gallery_assist_lightboxes_settings_submit(&$form, $form_state) {
+
+  if ($form_state['values']['lightboxes_select_one'] == 'none') {
+    variable_set('gallery_assist_lightbox_data', FALSE);
+  }
+  else {
+    //variable_set('gallery_assist_lightbox', $form_state['values']['lightboxes_select_one']);
+    foreach ($form_state['values'] as $key => $value) {
+      if (preg_match('/lightbox_conf/', $key)) {
+        $k = preg_replace('/lightbox_conf_/', '', $key);
+        
+        $data[$k] = $value;
+      }
+    }
+    
+    if ($form_state['values']['lightboxes_select_one'] == 'highslide') {
+      $data['the_path'] = drupal_get_path('module', 'gallery_assist_lightboxes') .'/lightboxes/highslide';
+    }
+    else {
+      if (!empty($data['the_path'])) {
+        unset($data['the_path']);
+      }
+    }
+
+    if (count($data) > 0) {
+      variable_set('gallery_assist_lightbox_data', $data);
+    }
+    
+    $hilfo = array(
+      'lightbox' => variable_get('gallery_assist_lightbox', FALSE),
+      'data' => array(
+        'css' => $form_state['values']['css_files'],
+        'js' => $form_state['values']['js_files'],
+        'selector' => $form_state['values']['selectors_files'],
+      ),
+    );
+    variable_set('gallery_assist_lightboxes_files', $hilfo);
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function gallery_assist_lightboxes_nodeapi(&$node, $op, $teaser, $page) {
+
+        if ($op == 'view' && variable_get('gallery_assist_lightbox', 'none') != 'none'  
+            && variable_get('gallery_assist_'. $node->type, 0) == 1 && count($node->gallitems) > 0) {
+
+          // Set the jQuery.extend Drupal.settings only once in teaser lists.
+          $lightbox_conf = drupal_get_js();
+          if (!preg_match("/lightbox_conf/", $lightbox_conf)) {
+            $data = variable_get('gallery_assist_lightbox_data', FALSE);
+            //$data['the_path'] = 'node/'. $node->nid .'/'.  $data['the_path'];
+            $js_settings = array(
+              'lightbox_conf' => array(
+                variable_get('gallery_assist_lightbox', 'none') => $data,
+              ),
+            );
+      
+            drupal_add_js($js_settings, 'setting');
+          }
+        }
+
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function gallery_assist_lightboxes_form_alter(&$form, $form_state, $form_id) {
+
+  if ($form_id == 'gallery_assist_settings_extras') {
+    drupal_add_css(drupal_get_path('module', 'gallery_assist') .'/css/galery_assist.css', 'module', 'all', FALSE);
+    $form['#submit'][] = 'gallery_assist_lightboxes_settings_submit';
+    $form['gallery_assist_extras'] += _gallery_assist_lightboxes_settings_form();
+  }
+
+}
+
+/**
+ * Form to select a lightbox variante and to read the simple help and credits.
+ */
+function _gallery_assist_lightboxes_settings_form() {
+  $form = array();
+
+  $form['00001'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Lightboxes for Gallery Assist'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+  );
+
+  $lightboxes_dir = drupal_get_path('module', 'gallery_assist_lightboxes') .'/lightboxes';
+  $scan = file_scan_directory($lightboxes_dir, '.', $nomask = array('.', '..'), 0, FALSE);
+  $options = array(
+    'none' => t('none'),
+  );
+  foreach ($scan as $k => $v) {
+    $options[$v->basename] = $v->basename;
+    if ($v->basename == 'lytebox') {
+      $options['lyteshow'] = 'lyteshow';
+    }
+  }
+
+  $form['00001']['lightboxes_select_one'] = array(
+    '#type' => 'select',
+    '#title' => 'Lightboxes',
+    '#default_value' => variable_get('gallery_assist_lightbox', 'none'),
+    '#description' => t('Choose a lightbox variant.'),
+    '#options' => $options,
+    '#ahah' => array(
+      'path' => 'gallery_assist_lightboxes/make/testform/js',
+      'wrapper' => 'mytest-fieldset-wrapper',
+      'progress' => array('type' => 'default', 'message' => t('Please wait...')),
+    ),
+  );
+
+  $variante_name = variable_get('gallery_assist_lightbox', 'none') == 'none' ? 'Info' : t('@lightbox_variant settings', array('@lightbox_variant' => variable_get('gallery_assist_lightbox', 'none')));
+  $form['00001']['lightbox_conf'] = array(
+    '#type' => 'fieldset',
+    '#title' =>  $variante_name,
+    '#prefix' => '<div id="mytest-fieldset-wrapper">',
+    '#suffix' => '</div>',
+  );
+
+  $form['00001']['lb_list'] = array(
+    '#type' => 'hidden',
+    '#value' => count($options) - 1,
+  );
+
+  $form['00001']['lightbox_conf']['data'] = _gallery_assist_lightbox_settings_form(variable_get('gallery_assist_lightbox', 'none'), count($options) - 1);
+
+  return $form;
+}
+
+/**
+ * Ahah callback from gallery_assist_lightboxes to rebuild a tail form.
+ */
+function gallery_assist_lightbox_build_settingsform_js() {
+  $cached_form_state = array();
+  $items = array();
+  $form = array();
+
+  // Load the form from the Form API cache.
+  if (!($cached_form = form_get_cache($_POST['form_build_id'], $cached_form_state)) || !isset($cached_form['gallery_assist_extras'])) {
+    form_set_error('form_token', t('Validation error, please try again. If this error persists, please contact the site administrator.'));
+    $output = theme('status_messages');
+    print drupal_to_js(array('status' => TRUE, 'data' => $output));
+    exit();
+  }
+
+  $form_state = array('values' => $_POST);
+  $form_state += $_FILES;
+
+  variable_set('gallery_assist_lightbox', $form_state['values']['lightboxes_select_one']);
+  variable_del('gallery_assist_lightbox_data');
+
+  $form['lightbox_conf'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('@lightboxes settings', array('@lightboxes' => $form_state['values']['lightboxes_select_one'])),
+    '#description' => '<div class="warning">* '. t('You have changed the lightbox for Gallery Assist. The configuration data are stored only by pressing the button save.') .'</div>',
+  );
+    //'#description' => '<div class="warning">* Sie haben die lightbox für Galerie-Assistent gewechselt. Die Konfigurationsdaten werden nur mit der Betätigung des Knopfes Save gespeichert.</div>',
+
+  $form['lightbox_conf']['data'] = _gallery_assist_lightbox_settings_form($form_state['values']['lightboxes_select_one'], $form_state['values']['lb_list']);
+
+  unset($cached_form['gallery_assist_extras']['00001']['lightbox_conf']);
+
+  $cached_form['gallery_assist_extras']['00001']['lightboxes_select_one']['#default_value'] = $form_state['values']['lightboxes_select_one'];
+  $cached_form['gallery_assist_extras']['00001']['lb_list']['#default_value'] = $form_state['values']['lb_list'];
+
+  $cached_form['gallery_assist_extras']['00001'] += $form;
+
+  form_set_cache($_POST['form_build_id'], $cached_form, $cached_form_state);
+
+  $form += array(
+    '#post' => $_POST,
+    '#programmed' => FALSE,
+    '#tree' => FALSE,
+    '#parents' => array(),
+  );
+
+  // Render the form for output.
+  drupal_alter('form', $form, array(), 'gallery_assist_lightbox_build_settingsform_js');
+  $form_state = array('submitted' => FALSE);
+  $form = form_builder('gallery_assist_lightbox_build_settingsform_js', $form, $form_state);
+  $output = theme('status_messages') . drupal_render($form);
+
+  print drupal_to_js(array('status' => TRUE, 'data' => $output));
+  exit();
+}
+
+function _gallery_assist_lightbox_settings_form($lb = 'none', $lb_list) {
+  $form = array();
+  $data = variable_get('gallery_assist_lightbox_data', FALSE);
+
+  switch ($lb) {
+    case 'none':
+      if ($lb_list === 0) {
+        $markup_value  = t('This module not contains lightboxes. The application facilitates to apply a lightbox to images belonging to a gallery created with Gallery Assist. It supports Lightbox2 and some of its modifications. These can be downloaded from their respective websites. Here the links:');
+        $markup_value .= '<ul><li>'. l('Lightbox2', 'http://www.lokeshdhakar.com/projects/lightbox2', array('attributes' => array('target' => '_blank'))) .'</li>';
+        $markup_value .= '<li>'. l('Litebox', 'http://www.dolem.com/lytebox', array('attributes' => array('target' => '_blank'))) .'</li>';
+        $markup_value .= '<li>'. l('ThickBox', 'http://jquery.com/demo/thickbox', array('attributes' => array('target' => '_blank'))) .'</li>';
+        $markup_value .= '<li>'. l('PrettyPhoto', 'http://www.no-margin-for-errors.com/projects/prettyPhoto-jquery-lightbox-clone', array('attributes' => array('target' => '_blank'))) .'</li></ul>';
+        $markup_value .= t('Once downloaded unpack the files, rename the folders to (lightbox, litebox, thickbox or prettyBox) and move all in to the lightboxes folder in the gallery_assist_lightboxes directory. Back to this adress and choose one.');    
+        $form['none'] = array(
+          '#type' => 'markup',
+          '#value' => $markup_value,
+        );
+      }
+      else {
+        $markup_value  = t('@lb_count lightbox modifications are available to use on this Drupal installation.', array('@lb_count' => $lb_list));
+        $form['none'] = array(
+          '#type' => 'markup',
+          '#value' => $markup_value,
+        );
+      }
+      break;
+
+    case 'prettyPhoto':
+      $form['lightbox_conf_theme'] = array(
+        '#type' => 'select',
+        '#title' => 'Appearance',
+        '#default_value' => $data['theme'] == '' ? 'dark_rounded' : $data['theme'],
+        '#options' => array(
+          'dark_rounded'  => t('Dark rounded'),
+          'dark_square'   => t('Dark square'),
+          'light_rounded' => t('Light rounded'),
+          'light_square'  => t('Light square'),
+        ),
+        '#prefix' => '<div class="gallery-assist-settings-left">',
+      );
+
+      $form['lightbox_conf_animationSpeed'] = array(
+        '#type' => 'select',
+        '#title' => t('Animation speed'),
+        '#default_value' => $data['animationSpeed'],
+        '#options' => array(
+          'normal' => 'Normal',
+          'fast'  => 'Fast',
+          'slow'   => 'Slow',
+        ),
+        '#suffix' => '</div>'
+      );
+
+      $form['lightbox_conf_opacity'] = array(
+        '#type' => 'select',
+        '#title' => t('Opacity'),
+        '#default_value' => $data['opacity'] == '' ? '0.9' : $data['opacity'],
+        '#options' => array(
+          '0.1'  => '0.1',
+          '0.2'  => '0.2',
+          '0.3'  => '0.3',
+          '0.4'  => '0.4',
+          '0.5'  => '0.5',
+          '0.6'  => '0.6',
+          '0.7'  => '0.7',
+          '0.8'  => '0.8',
+          '0.9'  => '0.9',
+          '1.0'  => '1.0',
+        ),
+        '#prefix' => '<div class="gallery-assist-settings-left">',
+      );
+
+      $form['lightbox_conf_counter_separator_label'] = array(
+        '#type' => 'select',
+        '#title' => t('Counter separator label'),
+        '#default_value' => $data['counter_separator_label'],
+        '#options' => array(
+          '/'  => '/',
+          '|'   => '|',
+          '-'  => '-',
+        ),
+        '#suffix' => '</div>'
+      );
+
+      $form['lightbox_conf_padding'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Padding'),
+        '#default_value' => $data['padding'] == '' ? 40 : $data['padding'],
+        '#size' => 4,
+        '#prefix' => '<div class="gallery-assist-settings-left">',
+      );
+
+      $form['lightbox_conf_showTitle'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Show title'),
+        '#default_value' => $data['showTitle'] == '' ? 0 : $data['showTitle'],
+      );
+
+      if ($data['allowresize'] == '') {
+        
+      }
+      $form['lightbox_conf_allowresize'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Allow resize'),
+        '#default_value' => $data['allowresize'] == '' ? true : $data['allowresize'],
+        '#suffix' => '</div>'
+      );
+      break;
+
+    case 'lytebox':
+      $form['lytebox'] = array(
+        '#type' => 'markup',
+        '#value' => gallery_assist_lightboxes($lb),
+      );
+      break;
+
+    case 'lyteshow':
+      $form['lytebox'] = array(
+        '#type' => 'markup',
+        '#value' => gallery_assist_lightboxes($lb),
+      );
+      break;
+
+    case 'lightbox':
+      $form['files'] = array();
+      $form['files'] = gallery_assist_lightboxes_get_files_form();
+      break;
+
+    case 'thickbox':
+      $form['thickbox'] = array(
+        '#type' => 'markup',
+        '#value' => gallery_assist_lightboxes($lb),
+      );
+      break;
+
+    case 'fancybox':
+      $form['files'] = array();
+      $form['files'] = gallery_assist_lightboxes_get_files_form();
+      break;
+
+    case 'colorbox':
+      $form['files'] = array();
+      $form['files'] = gallery_assist_lightboxes_get_files_form();
+      break;
+
+    case 'shadowbox':
+      $form['files'] = array();
+      $form['files'] = gallery_assist_lightboxes_get_files_form();
+      break;
+
+    case 'milkbox':
+      $form['files'] = array();
+      $form['files'] = gallery_assist_lightboxes_get_files_form();
+      break;
+
+    case 'MultiBox':
+      $form['files'] = array();
+      $form['files'] = gallery_assist_lightboxes_get_files_form();
+      break;
+
+    case 'highslide':
+      $form['files'] = array();
+      $form['files'] = gallery_assist_lightboxes_get_files_form();
+      $form['lightbox_conf_dimmingOpacity'] = array(
+        '#type' => 'select',
+        '#title' => t('Opacity'),
+        '#default_value' => $data['dimmingOpacity'] == '' ? '0.9' : $data['dimmingOpacity'],
+        '#options' => array(
+          '0.1'  => '0.1',
+          '0.2'  => '0.2',
+          '0.3'  => '0.3',
+          '0.4'  => '0.4',
+          '0.5'  => '0.5',
+          '0.6'  => '0.6',
+          '0.7'  => '0.7',
+          '0.8'  => '0.8',
+          '0.9'  => '0.9',
+          '1.0'  => '1.0',
+        ),
+      );
+      $form['lightbox_conf_width'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Box width'),
+        '#default_value' => $data['width'] == '' ? 600 : $data['width'],
+        '#size' => 4,
+      );
+      $form['lightbox_conf_height'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Box height'),
+        '#default_value' => $data['height'] == '' ? 400 : $data['height'],
+        '#size' => 4,
+      );
+      break;
+  }
+
+  return $form;
+}
+
+function gallery_assist_lightboxes_get_files_form($fcss = 'checkboxes', $fjs = 'checkboxes') {
+  $form = array();
+  $hilfo = variable_get('gallery_assist_lightboxes_files', FALSE);
+  
+  $form['lists'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Files to include',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+    '#description' => ('Please, visit the webpage from the lightbox you are choosed and read wich files are to be included in the respective version and their order.<br />Read the readme.txt file of the Lightbox for more informations.'),
+  );
+  
+  $css = file_scan_directory(drupal_get_path('module', 'gallery_assist_lightboxes'). '/lightboxes/'. variable_get('gallery_assist_lightbox', FALSE), '.css', array(), 0, TRUE);
+
+  foreach ($css as $css_v) {
+    $css_options[$css_v->filename] = $css_v->basename;
+  }
+  $form['lists']['css_files'] = array(
+    '#type' => $fcss,
+    '#title' => 'CSS files',
+    '#default_value' => !empty($hilfo['data']['css']) ? $hilfo['data']['css'] : array(),
+    '#options' => $css_options,
+  );
+  
+  $js = file_scan_directory(drupal_get_path('module', 'gallery_assist_lightboxes'). '/lightboxes/'. variable_get('gallery_assist_lightbox', FALSE), '.js', array(), 0, TRUE);
+
+  foreach ($js as $js_v) {
+    $js_options[$js_v->filename] = $js_v->basename;
+    
+  }
+  
+  $form['lists']['js_files'] = array(
+    '#type' => $fjs,
+    '#title' => 'JS files',
+    '#default_value' => !empty($hilfo['data']['js']) ? $hilfo['data']['js'] : array(),
+    '#options' => $js_options,
+  );
+  
+  if (variable_get('gallery_assist_lightbox', 'none') == 'highslide') {
+  $selectors = file_scan_directory(drupal_get_path('module', 'gallery_assist_lightboxes'). '/js', '.js', array(), 0, TRUE);
+
+    foreach ($selectors as $selectors_v) {
+      $myl = variable_get('gallery_assist_lightbox', 'none');
+      if (preg_match("/gallery_assist\.$myl/", $selectors_v->filename)) {
+        $selectors_options[$selectors_v->filename] = $selectors_v->basename;
+      }
+    }
+
+    $form['lists']['selectors_files'] = array(
+      '#type' => 'checkboxes',
+      '#title' => 'Selectors files',
+      '#default_value' => !empty($hilfo['data']['selector']) ? $hilfo['data']['selector'] : array(),
+      '#options' => $selectors_options,
+    );
+  }
+  
+  $form['lists']['lightbox'] = array(
+    '#type' => 'value',
+    '#value' => variable_get('gallery_assist_lightbox', FALSE),
+  );
+
+  $form['#submit'][] = 'hilfo_get_files_form_submit';
+
+  return $form;
+}
+
+function gallery_assist_lightboxes($lb = '') {
+  $output  = t('You have just selected the <strong>@lightbox</strong>. It work with default settings.', array('@lightbox' => $lb)) .'<br />';
+  $output .= t('Gallery Assist Lightboxes can\'t -for the moment- manage the settings to this lightbox.') .'<br />';
+  $output .= t('If you need to change the settings, do it directly in the js file.');
+    
+  return $output;
+}

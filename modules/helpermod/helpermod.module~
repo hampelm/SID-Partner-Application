@@ -1,0 +1,14 @@
+<?
+function helpermod_getnames() {
+$sql = "select field_organization_value from content_type_orgnization order by field_organization_value";
+$res = db_query($sql);
+$orgs = array();
+while ($row = db_fetch_array($res)) {
+$org = check_plain($row['field_organization_value']);
+$orgs[$org] = $org;
+
+}
+return $orgs;
+}
+
+

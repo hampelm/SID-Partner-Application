@@ -1,0 +1,16 @@
+name = Favorite Nodes
+description = Allows users to manage a favorite list of nodes.
+package = ""
+core = 6.x
+; Information added by drupal.org packaging script on 2008-03-14
+version = "6.x-1.x-dev"
+project = "favorite_nodes"
+datestamp = "1205508608"
+
+
+; Information added by drupal.org packaging script on 2011-02-25
+version = "6.x-1.x-dev"
+core = "6.x"
+project = "favorite_nodes"
+datestamp = "1298619230"
+

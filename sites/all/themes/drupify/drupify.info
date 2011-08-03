@@ -1,0 +1,18 @@
+name = Drupify
+description = Drupify is a port of a Joomla theme called RokWebify from RocketTheme.
+core = 6.x
+engine = phptemplate
+regions[right] = Right sidebar
+regions[header] = Header 
+regions[content] = Content
+regions[top_left] = Top Left
+regions[top_right] = Top Right
+regions[bottom_left] = Bottom Left
+regions[bottom_right] = Bottom Right
+
+; Information added by drupal.org packaging script on 2009-04-15
+version = "6.x-1.0"
+core = "6.x"
+project = "drupify"
+datestamp = "1239759938"
+
